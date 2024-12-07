@@ -1,9 +1,8 @@
 import argparse
 import time
+from typing import Optional
 from src.models.direction import Direction
 from src.models.bridge import Bridge
-from src.simulation.scheduler import CarScheduler
-from src.simulation.single_threaded import SingleThreadedBridge
 from src.utils.input_reader import InputReader
 from src.utils.logger import get_logger
 
@@ -30,38 +29,12 @@ def parse_args():
     )
     return parser.parse_args()
 
-def simulate_traffic_single(input_file: str, priority_direction: Direction = None):
-    """Запуск однопоточной симуляции"""
-    # Читаем данные о машинах
+def simulate_traffic(input_file: str, mode: str, priority_direction: Optional[Direction] = None):
     cars_data = InputReader.read_cars_data(input_file)
-    if not cars_data:
-        logger.error("No cars data found in input file")
-        return None
-        
-    # Создаем мост и запускаем симуляцию
-    bridge = SingleThreadedBridge(priority_direction)
+    is_multithreaded = mode == 'multi'
+    bridge = Bridge(priority_direction, is_multithreaded)
     return bridge.simulate(cars_data)
 
-def simulate_traffic_multi(input_file: str, priority_direction: Direction = None):
-    """Запуск многопоточной симуляции"""
-    bridge = Bridge(priority_direction)
-    
-    # Читаем данные о машинах
-    cars_data = InputReader.read_cars_data(input_file)
-    if not cars_data:
-        logger.error("No cars data found in input file")
-        return None
-    
-    # Создаем планировщик и запускаем симуляцию
-    scheduler = CarScheduler(cars_data, bridge)
-    scheduler.run()
-    
-    if not scheduler.wait_completion(timeout=120.0):
-        logger.warning("Simulation timeout reached before all cars completed")
-    else:
-        logger.info("All cars have completed their crossing")
-    
-    return bridge.get_statistics()
 
 def print_statistics(stats: dict):
     """Вывод статистики симуляции"""
@@ -81,15 +54,13 @@ def main():
     
     priority_direction = None
     if args.priority_direction:
-        priority_direction = Direction(args.priority_direction)
+        priority_direction = Direction[args.priority_direction.upper()]
     
     logger.info("Running simulation...")
     start_time = time.time()
     
-    if args.mode == 'single':
-        stats = simulate_traffic_single(args.input_file, priority_direction)
-    else:
-        stats = simulate_traffic_multi(args.input_file, priority_direction)
+    # Унифицированный запуск
+    stats = simulate_traffic(args.input_file, args.mode, priority_direction)
         
     if not stats:
         logger.error("Simulation failed")
@@ -99,6 +70,7 @@ def main():
     
     print_statistics(stats)
     logger.info(f"\nTotal simulation time: {total_time:.2f} seconds")
+
 
 if __name__ == "__main__":
     main()

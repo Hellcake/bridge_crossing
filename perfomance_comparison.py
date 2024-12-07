@@ -3,8 +3,7 @@ from typing import List, Tuple, Dict
 import matplotlib.pyplot as plt
 from src.models.direction import Direction
 from src.models.bridge import Bridge
-from src.simulation.scheduler import CarScheduler
-from src.simulation.single_threaded import SingleThreadedBridge
+
 from src.utils.logger import get_logger
 
 logger = get_logger(__name__)
@@ -27,20 +26,19 @@ def generate_test_data(num_cars: int, time_span: float) -> List[Tuple[float, int
         cars_data.append((arrival_time, i, direction))
     return sorted(cars_data)  # Сортируем по времени прибытия
 
+
 def run_comparison(cars_data: List[Tuple[float, int, Direction]]) -> Tuple[Dict, Dict]:
     """
     Запускает обе реализации и возвращает их статистику
     """
-    # Многопоточная реализация
-    multi_bridge = Bridge()
-    scheduler = CarScheduler(cars_data, multi_bridge)
-    scheduler.run()
-    scheduler.wait_completion()
-    multi_stats = multi_bridge.get_statistics()
-    
     # Однопоточная реализация
-    single_bridge = SingleThreadedBridge()
+    single_bridge = Bridge(is_multithreaded=False)
     single_stats = single_bridge.simulate(cars_data)
+
+    # Многопоточная реализация
+    multi_bridge = Bridge(is_multithreaded=True)
+    multi_stats = multi_bridge.simulate(cars_data)
+
     return single_stats, multi_stats
 
 def compare_implementations(test_cases: List[int], time_span: float = 10.0):
@@ -145,7 +143,7 @@ def plot_results(test_cases: List[int], results: Dict):
 
 def main():
     # Тестовые случаи: разное количество машин
-    test_cases = [3, 5, 10, 20]
+    test_cases = [100, 500, 1000, 5000]
     time_span = 10.0  # Временной интервал в секундах
     
     logger.info("Starting simulation comparison...")
